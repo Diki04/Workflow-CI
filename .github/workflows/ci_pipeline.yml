@@ -57,5 +57,5 @@ jobs:
       run: |
         mlflow build-docker \
           --model-uri MLProject/ \
-          --image-name $DOCKER_IMAGE_NAME:latest \
-          --push
+          --name $DOCKER_IMAGE_NAME:latest
+          docker push $DOCKER_IMAGE_NAME:latest
