@@ -6,6 +6,7 @@ dependencies:
   - python=3.12
   - pip
   - pip:
+    - "setuptools<68"
     - mlflow==2.9.2
     - scikit-learn
     - pandas

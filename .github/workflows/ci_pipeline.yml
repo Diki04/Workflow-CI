@@ -30,8 +30,7 @@ jobs:
     - name: 3. Install MLflow
       run: |
         pip install --upgrade pip
-        pip install "setuptools<68" 
-        pip install mlflow==2.9.2
+        pip install "setuptools<68" mlflow==2.9.2
 
     - name: 4. Run MLflow Project (Training)
       shell: bash -l {0}
