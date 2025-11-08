@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'MlProject/**'
+      - 'MLProject/**'
   workflow_dispatch:
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
     - name: 2. Setup Python and Conda
       uses: actions/setup-python@v4
       with:
-        python_version: '3.12'
+        python-version: '3.12'
     - name: Setup Conda
       uses: conda-incubator/setup-miniconda@v2
       with:
