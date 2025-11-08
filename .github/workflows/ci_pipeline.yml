@@ -28,7 +28,9 @@ jobs:
         python-version: 3.12
 
     - name: 3. Install MLflow
-      run: pip install mlflow==2.9.2
+      run: |
+        pip install --upgrade pip setuptools 
+        pip install mlflow==2.9.2
 
     - name: 4. Run MLflow Project (Training)
       shell: bash -l {0}
