@@ -1,10 +1,18 @@
-name: Workflow-CI-Gym
+name: Gym_Regression_CI
 
-conda_env: conda.yaml
+# Kita tidak pakai Conda lagi, kita pakai 'local'
+# 'local' berarti 'gunakan environment yang sudah aktif'
+# Ini akan membaca 'requirements.txt'
+environment:
+  image: python:3.12.7 # <-- DIUBAH agar konsisten dengan ci_pipeline.yml
+  pip_requirements: requirements.txt
 
+# Definisi entry point (perintah yang dijalankan)
 entry_points:
   main:
+    # Tentukan parameter yang bisa di-pass
     parameters:
       n_estimators: {type: int, default: 100}
-      max_depth: {type: int, default: 3}
-    command: "python modelling.py --n_estimators {n_estimators} --max_depth {max_depth}"
+      max_depth: {type: int, default: 10}
+    # Perintah yang dijalankan
+    command: "python modelling.py {n_estimators} {max_depth}"

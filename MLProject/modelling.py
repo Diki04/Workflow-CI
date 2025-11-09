@@ -1,105 +1,95 @@
 import mlflow
-import mlflow.tensorflow # Penting untuk log model TF
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Input
-import numpy as np
 import pandas as pd
+import numpy as np
+from sklearn.ensemble import RandomForestRegressor
+import os
+import sys
+import warnings
+import json
+import matplotlib.pyplot as plt
+from sklearn.metrics import r2_score, mean_squared_error
 
-# Set MLflow experiment
-mlflow.set_tracking_uri("file:./mlruns")
-mlflow.set_experiment("gym_model_experiment_ci")
+if __name__ == "__main__":
+    warnings.filterwarnings("ignore")
+    np.random.seed(40)
 
-with mlflow.start_run() as run:
-    
-    # --- 1. Ambil Parameter ---
-    # Ambil parameter dari MLflow run (jika dijalankan via 'mlflow run')
-    params = mlflow.active_run().data.params
-    epochs = int(params.get("epochs", 50)) # Default 50 epochs untuk Deep Learning
-    batch_size = int(params.get("batch_size", 32)) # Default 32
-
-    print(f"Training model TensorFlow dengan {epochs} epochs dan batch size {batch_size}")
-    
-    # Log parameter ke MLflow
-    mlflow.log_param("epochs", epochs)
-    mlflow.log_param("batch_size", batch_size)
-
-    # --- 2. Load Data (Sesuai Case Anda) ---
+    # --- 1. Load Data (Sesuai Case Anda) ---
     data_path = "gym_preprocessing/"
     try:
-        print("Loading preprocessed data...")
         X_train = np.load(data_path + "X_train.npy")
         X_test = np.load(data_path + "X_test.npy")
+        y_train = pd.read_csv(data_path + "y_train.csv").values.ravel()
+        y_test = pd.read_csv(data_path + "y_test.csv").values.ravel()
+    except FileNotFoundError:
+        print(f"Error: Data files not found in {data_path}")
+        sys.exit(1)
+
+    # Input example untuk 'mlflow.sklearn.log_model'
+    input_example = X_train[0:5]
+
+    # --- 2. Ambil Parameter dari CLI (didefinisikan di MLProject) ---
+    # Jika 'mlflow run' dijalankan tanpa arg, ini akan jadi default
+    n_estimators = int(sys.argv[1]) if len(sys.argv) > 1 else 100
+    max_depth = int(sys.argv[2]) if len(sys.argv) > 2 else None
+
+    with mlflow.start_run():
+        # Set tracking URI agar 'mlruns' ada di dalam folder MLProject
+        mlflow.set_tracking_uri("file:./mlruns")
+
+        # --- 3. Training Model REGRESI ---
+        model = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=42)
+        model.fit(X_train, y_train)
+
+        predicted = model.predict(X_test)
+
+        # --- 4. Log Model ---
+        mlflow.sklearn.log_model(
+            sk_model=model,
+            artifact_path="model", # Ini harus "model"
+            input_example=input_example
+        )
+
+        # --- 5. Log Metrik REGRESI ---
+        r2 = r2_score(y_test, predicted)
+        mse = mean_squared_error(y_test, predicted)
+
+        mlflow.log_metric("r2_score", r2)
+        mlflow.log_metric("mse", mse)
+
+        # Log parameter yang digunakan
+        mlflow.log_param("n_estimators", n_estimators)
+        mlflow.log_param("max_depth", str(max_depth)) # Log sebagai string
+
+        # --- 6. Buat dan Simpan Artefak Visualisasi ---
+        # Ganti Confusion Matrix dengan Plot Regresi
         
-        y_train_df = pd.read_csv(data_path + "y_train.csv")
-        y_test_df = pd.read_csv(data_path + "y_test.csv")
+        # Buat folder 'artifacts' (meniru 'cm' dari contoh)
+        os.makedirs("artifacts", exist_ok=True)
         
-        y_train = y_train_df.values.ravel()
-        y_test = y_test_df.values.ravel()
+        # Buat Scatter Plot (True vs Predicted)
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.scatter(y_test, predicted, alpha=0.5)
+        ax.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 'r--', lw=2)
+        ax.set_xlabel("Nilai Asli (True Values)")
+        ax.set_ylabel("Nilai Prediksi (Predicted Values)")
+        ax.set_title(f"Plot Regresi (R2: {r2:.3f})")
         
-        print("Data loaded successfully.")
-        print(f"X_train shape: {X_train.shape}")
+        plot_path = os.path.join("artifacts", "regression_plot.png")
+        plt.savefig(plot_path)
+        
+        # Log .png ini ke MLflow
+        mlflow.log_artifact(plot_path)
 
-    except FileNotFoundError as e:
-        print(f"Error loading data: {e}")
-        print("Pastikan file .npy dan .csv ada di folder 'gym_preprocessing/'")
-        exit(1) # Keluar jika data tidak ada
+        # Simpan metrik ke JSON (meniru contoh)
+        metrics = {
+            "r2_score": r2,
+            "mse": mse
+        }
+        json_path = os.path.join("artifacts", "metrics.json")
+        with open(json_path, "w") as f:
+            json.dump(metrics, f)
+        
+        # Log .json ini ke MLflow
+        mlflow.log_artifact(json_path)
 
-    # --- 3. Buat Arsitektur Model REGRESI ---
-    print("Building REGRESSION model...")
-    model = Sequential([
-        # Tentukan input_shape di layer pertama
-        Input(shape=(X_train.shape[1],)),
-        # Hidden layers
-        Dense(64, activation='relu'),
-        Dense(32, activation='relu'),
-        # Output layer untuk REGRESI
-        # Hanya 1 neuron (output), tanpa aktivasi (linear)
-        Dense(1) 
-    ])
-    
-    # Compile model untuk REGRESI
-    model.compile(optimizer='adam', 
-                  loss='mean_squared_error', # Loss untuk regresi
-                  metrics=['mse', 'mae'])     # Metrik untuk regresi
-    
-    print(model.summary())
-
-    # --- 4. Training Model ---
-    print("Starting model training...")
-    model.fit(X_train, y_train, 
-              epochs=epochs, 
-              batch_size=batch_size, 
-              validation_data=(X_test, y_test),
-              verbose=2) # Tampilkan log training
-
-    # --- 5. Evaluasi dan Log Metrik REGRESI ---
-    print("Evaluating model...")
-    eval_results = model.evaluate(X_test, y_test, verbose=0)
-    
-    # [loss, mse, mae]
-    loss = eval_results[0]
-    mse = eval_results[1]
-    mae = eval_results[2]
-    
-    print(f"Evaluation complete. Loss (MSE): {loss:.4f}, MAE: {mae:.4f}")
-
-    # Log metrik REGRESI
-    mlflow.log_metric("loss", loss)
-    mlflow.log_metric("mse", mse)
-    mlflow.log_metric("mae", mae)
-
-    # --- 6. Log Model dan Cetak RUN_ID (KRITIKAL) ---
-    print("Logging model to MLflow...")
-    # Log model TF, harus dinamai "model" agar 'build-docker' berfungsi
-    mlflow.tensorflow.log_model(
-        model, 
-        "model",
-        input_example=X_train[:5] # Tambahkan contoh input
-    )
-
-    print(f"Training selesai. Loss: {loss:.4f}, MAE: {mae:.4f}")
-    
-    # --- INI ADALAH KUNCI UTAMA CI/CD ---
-    # Cetak Run ID agar bisa ditangkap oleh GitHub Actions
-    print(f"MLFLOW_RUN_ID={run.info.run_id}")
+        print(f"Run complete. R2 Score: {r2:.4f}, MSE: {mse:.4f}")
