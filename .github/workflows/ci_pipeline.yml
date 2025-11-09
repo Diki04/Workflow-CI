@@ -30,7 +30,7 @@ jobs:
       shell: bash -l {0} 
       run: |
         # Aktifkan env
-        source activate mlflow-env
+        source ~/miniconda3/etc/profile.d/conda.sh && conda activate mlflow-env        
         
         # Jalankan training dan tangkap outputnya
         # Output dari 'mlflow run' akan disimpan di variabel $OUTPUT
