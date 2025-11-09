@@ -1,12 +1,14 @@
-name: mlproject-gym-env
+# MLProject/conda.yaml
+name: my_ml_env
 channels:
-  - conda-forge
   - defaults
+  - conda-forge
 dependencies:
   - python=3.9
   - pip
   - pip:
     - mlflow>=2.0
-    - scikit-learn
     - pandas
     - numpy
+    - scikit-learn
+    - tensorflow

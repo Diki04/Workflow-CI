@@ -1,5 +1,8 @@
-name: MLflow CI-CD
+# .github/workflows/ci_pipeline.yml
 
+name: MLflow CI-CD Kriteria 3
+
+# Trigger: Workflow ini berjalan setiap kali ada push ke branch 'main'
 on:
   push:
     branches:
@@ -10,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+    # --- 1. Persiapan ---
     - name: 1. Checkout Repository
       uses: actions/checkout@v4
 
@@ -18,63 +22,82 @@ jobs:
       with:
         python-version: 3.9
 
-    - name: 3. Install Conda dan MLflow
+    # --- 2. Instalasi (Memperbaiki error 'activate' Anda) ---
+    - name: 3. Install Conda
       uses: conda-incubator/setup-miniconda@v3
       with:
         auto-update-conda: true
         python-version: 3.9
-      
-    
-    - name: 4.  Run MLflow Project (Training)
-      id: train
-      shell: bash -l {0} 
+        # Kita HAPUS 'conda-yaml-file' dari sini
+
+    - name: 3.5. Create Conda Environment
+      shell: bash -l {0} # Wajib pakai 'bash -l {0}' untuk 'conda'
       run: |
-        # Aktifkan env
-        source ~/miniconda3/etc/profile.d/conda.sh && conda activate mlflow-env        
+        # Buat environment secara manual dari file
+        echo "Membuat environment 'my_ml_env' dari file..."
+        conda env create -f MLProject/conda.yaml
+
+    # --- 3. Kriteria Basic (Menjalankan Training) ---
+    - name: 4. (BASIC) Run MLflow Project (Training)
+      id: train # Kita beri 'id' agar bisa mengambil outputnya
+      shell: bash -l {0} # Wajib untuk 'source activate'
+      run: |
+        # Aktifkan env yang dibuat di langkah 3.5
+        source activate my_ml_env
         
+        echo "Starting MLflow Run..."
         # Jalankan training dan tangkap outputnya
-        # Output dari 'mlflow run' akan disimpan di variabel $OUTPUT
         OUTPUT=$(mlflow run ./MLProject)
         
-        # Cetak output untuk debugging
+        echo "MLflow run output:"
         echo "$OUTPUT"
         
-        # Ambil RUN_ID yang kita cetak di modelling.py
+        # Ambil RUN_ID yang dicetak oleh modelling.py
         RUN_ID=$(echo "$OUTPUT" | grep 'MLFLOW_RUN_ID=' | cut -d'=' -f2)
         
+        # Cek apakah RUN_ID ada
+        if [ -z "$RUN_ID" ]; then
+          echo "Error: Could not find MLFLOW_RUN_ID!"
+          exit 1
+        fi
+        
+        echo "MLflow Run ID found: $RUN_ID"
         # Ekspor RUN_ID agar bisa dipakai di langkah selanjutnya
         echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
 
-    - name: 5. Upload Artifacts (Model)
+    # --- 4. Kriteria Skilled (Menyimpan Artefak) ---
+    - name: 5. (SKILLED) Upload Artifacts (Model)
       uses: actions/upload-artifact@v4
       with:
-        name: ml-model-artifacts 
-        path: ./MLProject/mlruns 
+        name: ml-model-artifacts # Nama file zip artefak
+        path: MLProject/mlruns # Upload folder mlruns yang dibuat di Langkah 4
 
-    - name: 6. Login to Docker Hub
+    # --- 5. Kriteria Advanced (Build & Push Docker) ---
+    - name: 6. (ADVANCED) Login to Docker Hub
       uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: 7. Build Docker Image with MLflow
-      shell: bash -l {0}
+    - name: 7. (ADVANCED) Build Docker Image with MLflow
+      shell: bash -l {0} # Wajib untuk 'source activate'
       run: |
         # Aktifkan env lagi
-        source activate mlflow-env
+        source activate my_ml_env
         
-        # Ambil RUN_ID dari langkah 'train'
+        # Ambil RUN_ID dari output Langkah 4
         RUN_ID=${{ steps.train.outputs.run_id }}
         
         # Bangun image menggunakan 'mlflow models build-docker'
-        # Ini akan mengambil model dari folder mlruns lokal
-        # Ganti 'nama-image-anda' dengan nama image di Docker Hub
+        # Ganti 'model-gym-ci' dengan nama image Anda
+        echo "Building Docker image for run_id: $RUN_ID"
         mlflow models build-docker \
           --model-uri "runs:/$RUN_ID/model" \
-          --name "${{ secrets.DOCKERHUB_USERNAME }}/model-gym-ci:latest" \
+          --name "evameivina/model-gym-ci:latest" \
           --env-manager=local
           
     - name: 8. (ADVANCED) Push Docker Image to Docker Hub
       run: |
-        # Push image yang sudah di-build
-        docker push ${{ secrets.DOCKERHUB_USERNAME }}/model-gym-ci:latest
+        # Push image yang sudah di-build di Langkah 7
+        echo "Pushing image to Docker Hub..."
+        docker push evameivina/model-gym-ci:latest
