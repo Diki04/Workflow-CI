@@ -66,10 +66,11 @@ jobs:
         
         echo "Membangun Docker image untuk RUN_ID: $RUN_ID"
         
-        # --- PERBAIKAN STABIL ---
-        # Kita berikan path file langsung ke folder model.
+        # --- PERBAIKAN FINAL ---
+        # Kita berikan path ke root 'artifacts/', di mana file MLmodel berada
+        # Kita hapus '/model' dari akhir path ini
         mlflow models build-docker \
-          --model-uri "MLProject/mlruns/0/$RUN_ID/artifacts/model" \
+          --model-uri "MLProject/mlruns/0/$RUN_ID/artifacts/" \
           --name "firecrown/model-gym-ci" \
           --env-manager=local
 
