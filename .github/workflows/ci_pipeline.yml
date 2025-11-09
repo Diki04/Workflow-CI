@@ -65,13 +65,13 @@ jobs:
           # Ganti 'evameivina/model-gym-ci' dengan nama Anda
           mlflow models build-docker \
             --model-uri "runs:/$RUN_ID/model" \
-            --name "evameivina/model-gym-ci" \
+            --name "firecrown/model-gym-ci" \
             --env-manager=local
             
       - name: 9. (ADVANCED) Tag and Push Docker Image
         run: |
           # Ganti 'evameivina/model-gym-ci' dengan nama Anda
-          docker tag "evameivina/model-gym-ci" "${{ secrets.DOCKERHUB_USERNAME }}/model-gym-ci:latest"
+          docker tag "firecrown/model-gym-ci" "${{ secrets.DOCKERHUB_USERNAME }}/model-gym-ci:latest"
           docker push "${{ secrets.DOCKERHUB_USERNAME }}/model-gym-ci:latest"
 
       # --- Bonus: Push artefak visualisasi kembali ke Repo ---
