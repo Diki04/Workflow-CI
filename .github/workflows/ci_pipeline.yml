@@ -73,7 +73,7 @@ jobs:
         
         # Sekarang sintaks 'runs:/' akan berfungsi
         mlflow models build-docker \
-          --model-uri "runs:/$RUN_ID/model" \
+          --model-uri "MLProject/mlruns/0/$RUN_ID/artifacts/random_forest_model" \
           --name "firecrown/model-gym-ci" \
           --env-manager=local
 
