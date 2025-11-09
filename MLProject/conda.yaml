@@ -3,11 +3,11 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.9
+  - python=3.12
   - pip
   - pip:
-    - "setuptools<68"
-    - mlflow==2.9.2
+    - setuptools
+    - mlflow
     - scikit-learn
     - pandas
     - numpy
