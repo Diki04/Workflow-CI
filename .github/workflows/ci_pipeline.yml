@@ -1,81 +1,80 @@
-# File: .github/workflows/ci_pipeline.yml
-
-name: 3. CI Pipeline (MLProject + Docker)
+name: MLflow CI-CD
 
 on:
   push:
     branches:
       - main
-    paths:
-      - 'MLProject/**'
-  workflow_dispatch:
 
 jobs:
-  run-mlproject-and-build-docker:
+  train-and-deploy:
     runs-on: ubuntu-latest
-
-    steps:
     
-    - name: 1. Checkout repository
+    steps:
+    - name: 1. Checkout Repository
       uses: actions/checkout@v4
 
-    # Kembali ke Python 3.11 (modern)
-    - name: 2. Setup Conda
-      uses: conda-incubator/setup-miniconda@v2
+    - name: 2. Set up Python 3.9
+      uses: actions/setup-python@v5
       with:
-        auto-update-conda: True
-        python-version: 3.12 # <-- Versi Modern
+        python-version: 3.9
 
-    # Install MLflow terbaru (bukan 2.9.2)
-    - name: 3. Install MLflow
+    - name: 3. Install Conda dan MLflow
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        auto-update-conda: true
+        python-version: 3.9
+        conda-yaml-file: MLProject/conda.yaml
+    
+    - name: 4.  Run MLflow Project (Training)
+      id: train
+      shell: bash -l {0} 
       run: |
-        pip install --upgrade pip setuptools
-        pip install mlflow # <-- Versi Terbaru
+        # Aktifkan env
+        source activate mlflow-env
+        
+        # Jalankan training dan tangkap outputnya
+        # Output dari 'mlflow run' akan disimpan di variabel $OUTPUT
+        OUTPUT=$(mlflow run ./MLProject)
+        
+        # Cetak output untuk debugging
+        echo "$OUTPUT"
+        
+        # Ambil RUN_ID yang kita cetak di modelling.py
+        RUN_ID=$(echo "$OUTPUT" | grep 'MLFLOW_RUN_ID=' | cut -d'=' -f2)
+        
+        # Ekspor RUN_ID agar bisa dipakai di langkah selanjutnya
+        echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
 
-    # Langkah 4 & 5 tetap sama
-    - name: 4. Run MLflow Project (Training)
-      shell: bash -l {0}
-      run: |
-        mlflow run MLProject/ \
-         -P n_estimators=150 \
-         -P max_depth=10
-
-    - name: 5. Upload MLflow 'mlruns' artifacts
+    - name: 5. Upload Artifacts (Model)
       uses: actions/upload-artifact@v4
       with:
-        name: mlruns-artifact
-        path: mlruns/
+        name: ml-model-artifacts 
+        path: ./MLProject/mlruns 
 
-    # Langkah 6 tetap sama
     - name: 6. Login to Docker Hub
       uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    # ==============================================================
-    # LANGKAH 7 YANG BARU (Menggantikan mlflow build-docker)
-    # Ini adalah cara yang Anda lihat di contoh sukses
-    # ==============================================================
-    - name: 7. Build and Push Docker Image (Standar Industri)
+    - name: 7. Build Docker Image with MLflow
+      shell: bash -l {0}
       run: |
-        # 7.1. Dapatkan RUN_ID dari model yang baru dilatih
-        # Ini adalah langkah 'Get latest MLflow run_id' di contoh Anda
-        export LATEST_RUN_ID=$(ls -t mlruns/0 | head -n 1)
-        echo "LATEST_RUN_ID=${LATEST_RUN_ID}" >> $GITHUB_ENV
-        echo "Membangun model dari Run ID: ${LATEST_RUN_ID}"
-
-        # 7.2. Perbarui 'CMD' di Dockerfile dengan RUN_ID yang benar
-        # Ini adalah bagian "sulap"nya
-        sed -i "s|\[RUN_ID\]|${LATEST_RUN_ID}|g" MLProject/Dockerfile
-
-        # 7.3. Build, Tag, dan Push (seperti di contoh Anda)
-        export DOCKER_IMAGE_NAME="firecrown/model-gym-ci" # <-- GANTI INI
+        # Aktifkan env lagi
+        source activate mlflow-env
         
-        # Build
-        docker build -t $DOCKER_IMAGE_NAME:latest -f MLProject/Dockerfile ./MLProject
+        # Ambil RUN_ID dari langkah 'train'
+        RUN_ID=${{ steps.train.outputs.run_id }}
         
-        # Tag (sudah dilakukan oleh -t)
-        
-        # Push
-        docker push $DOCKER_IMAGE_NAME:latest
+        # Bangun image menggunakan 'mlflow models build-docker'
+        # Ini akan mengambil model dari folder mlruns lokal
+        # Ganti 'nama-image-anda' dengan nama image di Docker Hub
+        mlflow models build-docker \
+          --model-uri "runs:/$RUN_ID/model" \
+          --name "${{ secrets.DOCKERHUB_USERNAME }}/model-gym-ci:latest" \
+          --env-manager=local
+          
+    - name: 8. (ADVANCED) Push Docker Image to Docker Hub
+      run: |
+        # Push image yang sudah di-build
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/model-gym-ci:latest
