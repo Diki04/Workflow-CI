@@ -33,7 +33,6 @@ jobs:
     - name: 4. (BASIC) Run MLflow Project (Training)
       run: |
         # Jalankan 'main' entry point dari file MLProject
-        # Ini akan otomatis menjalankan 'python modelling.py 100 10'
         mlflow run MLProject --env-manager=local
 
     # --- 4. Kriteria Skilled (Menyimpan Artefak) ---
@@ -41,7 +40,6 @@ jobs:
       id: get_run_id # Beri id agar bisa dipakai di langkah lain
       run: |
         # Cari RUN_ID terakhir di dalam folder mlruns
-        # (Path MLProject/mlruns/0/.../ -> kita ambil bagian ke-4)
         RUN_ID=$(ls -td MLProject/mlruns/0/*/ | head -n 1 | cut -d'/' -f4)
         echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
         echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
@@ -61,21 +59,20 @@ jobs:
 
     # --- 5. Kriteria Advanced (Build & Push Docker) ---
     
-    # --- LANGKAH 8 (DENGAN PERBAIKAN PENTING) ---
+    # --- LANGKAH 8 (PERBAIKAN FINAL DAN LEBIH STABIL) ---
     - name: 8. (ADVANCED) Build Docker Image with MLflow
       run: |
         # Ambil RUN_ID dari langkah 5
         RUN_ID=${{ steps.get_run_id.outputs.run_id }}
         
-        # --- INI ADALAH PERBAIKAN KUNCI ---
-        # Beritahu MLflow di mana harus mencari 'mlruns'
-        export MLFLOW_TRACKING_URI=MLProject/mlruns
+        echo "Membangun Docker image untuk RUN_ID: $RUN_ID"
         
-        echo "Membangun Docker image untuk RUN_ID: $RUN_ID dari $MLFLOW_TRACKING_URI"
-        
-        # Perintah build Anda (sudah benar)
+        # --- PERBAIKAN KUNCI ---
+        # Daripada menggunakan 'runs:/' yang rumit, kita berikan path file langsung
+        # ke folder model yang sudah kita ketahui lokasinya.
+        # Ini jauh lebih stabil.
         mlflow models build-docker \
-          --model-uri "runs:/$RUN_ID/model" \
+          --model-uri "MLProject/mlruns/0/$RUN_ID/artifacts/model" \
           --name "firecrown/model-gym-ci" \
           --env-manager=local
 
