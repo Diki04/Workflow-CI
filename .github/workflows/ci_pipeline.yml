@@ -59,7 +59,6 @@ jobs:
 
     # --- 5. Kriteria Advanced (Build & Push Docker) ---
     
-    # --- LANGKAH 8 (PERBAIKAN FINAL DAN LEBIH STABIL) ---
     - name: 8. (ADVANCED) Build Docker Image with MLflow
       run: |
         # Ambil RUN_ID dari langkah 5
@@ -67,16 +66,13 @@ jobs:
         
         echo "Membangun Docker image untuk RUN_ID: $RUN_ID"
         
-        # --- PERBAIKAN KUNCI ---
-        # Daripada menggunakan 'runs:/' yang rumit, kita berikan path file langsung
-        # ke folder model yang sudah kita ketahui lokasinya.
-        # Ini jauh lebih stabil.
+        # --- PERBAIKAN STABIL ---
+        # Kita berikan path file langsung ke folder model.
         mlflow models build-docker \
           --model-uri "MLProject/mlruns/0/$RUN_ID/artifacts/model" \
           --name "firecrown/model-gym-ci" \
           --env-manager=local
 
-    # --- LANGKAH 9 (SUDAH BENAR) ---
     - name: 9. (ADVANCED) Tag and Push Docker Image
       run: |
         # Tag image yang di-build di Langkah 8
@@ -85,12 +81,16 @@ jobs:
         # Push image ke Docker Hub
         docker push "${{ secrets.DOCKERHUB_USERNAME }}/model-gym-ci:latest"
 
-    # --- 6. (Bonus) Push Artefak kembali ke Repo ---
+    # --- 6. (Bonus) Push Artefak kembali ke Repo (PERBAIKAN PATH) ---
     - name: 10. Commit and push ML artifacts
       run: |
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-        git add MLProject/artifacts/*.png MLProject/artifacts/*.json
+        
+        # --- PERBAIKAN ---
+        # Kita cari file artefak di 'MLProject/' bukan 'MLProject/artifacts/'
+        git add MLProject/*.png MLProject/*.json
+        
         # Cek jika ada perubahan untuk di-commit
         if [ -n "$(git status --porcelain)" ]; then
           git commit -m "📦 [CI] Add regression plot and metrics"
