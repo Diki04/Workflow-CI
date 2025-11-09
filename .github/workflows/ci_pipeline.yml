@@ -59,18 +59,21 @@ jobs:
 
     # --- 5. Kriteria Advanced (Build & Push Docker) ---
     
+    # --- LANGKAH 8 (DENGAN PERBAIKAN 'TRACKING_URI') ---
     - name: 8. (ADVANCED) Build Docker Image with MLflow
       run: |
         # Ambil RUN_ID dari langkah 5
         RUN_ID=${{ steps.get_run_id.outputs.run_id }}
         
-        echo "Membangun Docker image untuk RUN_ID: $RUN_ID"
+        # --- INI ADALAH PERBAIKAN KUNCI ---
+        # Beritahu MLflow di mana harus mencari 'mlruns'
+        export MLFLOW_TRACKING_URI=MLProject/mlruns
         
-        # --- PERBAIKAN FINAL ---
-        # Kita berikan path ke root 'artifacts/', di mana file MLmodel berada
-        # Kita hapus '/model' dari akhir path ini
+        echo "Membangun Docker image untuk RUN_ID: $RUN_ID dari $MLFLOW_TRACKING_URI"
+        
+        # Sekarang sintaks 'runs:/' akan berfungsi
         mlflow models build-docker \
-          --model-uri "MLProject/mlruns/0/$RUN_ID/artifacts/" \
+          --model-uri "runs:/$RUN_ID/model" \
           --name "firecrown/model-gym-ci" \
           --env-manager=local
 
@@ -88,8 +91,7 @@ jobs:
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
         
-        # --- PERBAIKAN ---
-        # Kita cari file artefak di 'MLProject/' bukan 'MLProject/artifacts/'
+        # Cari file artefak di 'MLProject/'
         git add MLProject/*.png MLProject/*.json
         
         # Cek jika ada perubahan untuk di-commit
