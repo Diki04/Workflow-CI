@@ -23,7 +23,7 @@ jobs:
       with:
         auto-update-conda: true
         python-version: 3.9
-        environment-file: MLProject/conda.yaml
+      
     
     - name: 4.  Run MLflow Project (Training)
       id: train
