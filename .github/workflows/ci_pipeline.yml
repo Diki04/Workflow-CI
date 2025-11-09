@@ -24,7 +24,7 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2
       with:
         auto-update-conda: True
-        python-version: 3.11 # <-- Versi Modern
+        python-version: 3.12 # <-- Versi Modern
 
     # Install MLflow terbaru (bukan 2.9.2)
     - name: 3. Install MLflow
