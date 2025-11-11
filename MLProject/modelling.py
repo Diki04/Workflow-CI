@@ -10,85 +10,99 @@ import json
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, r2_score
 
-# --- (1) Baca parameter dari 'mlflow run' ---
-# Parameter ini didefinisikan di file 'MLProject'
 n_estimators = int(sys.argv[1]) if len(sys.argv) > 1 else 100
 max_depth = int(sys.argv[2]) if len(sys.argv) > 2 else 10
 
-# --- (2) Kode ini berjalan DI DALAM 'mlflow run' (Tidak perlu 'with mlflow.start_run()') ---
 print(f"Training with n_estimators={n_estimators}, max_depth={max_depth}")
 
-# Load Data (sesuai case Anda)
-data_path = "gym_preprocessing/"
+# Load dataset 
+data_path = "../MLProject/gym_preprocessing/gym_preprocessing.csv"
 try:
-    print("Loading preprocessed data...")
-    X_train = np.load(data_path + "X_train.npy")
-    X_test = np.load(data_path + "X_test.npy")
-    y_train_df = pd.read_csv(data_path + "y_train.csv")
-    y_test_df = pd.read_csv(data_path + "y_test.csv")
-    y_train = y_train_df.values.ravel()
-    y_test = y_test_df.values.ravel()
-    print("Data loaded successfully.")
+    print(f"📥 Memuat dataset tunggal dari: {data_path}")
+    df = pd.read_csv(data_path)
+    print(f"✅ Dataset dimuat! Bentuk data: {df.shape}")
 except FileNotFoundError:
-    print(f"Error: Data files not found in {data_path}")
+    print(f"❌ Error: File {data_path} tidak ditemukan.")
     sys.exit(1)
 
-# Ambil contoh input
-input_example = X_train[0:5]
+# Pisahkan fitur dan target
+target_col = "Calories_Burned"
+if target_col not in df.columns:
+    print(f"❌ Kolom target '{target_col}' tidak ditemukan di dataset.")
+    sys.exit(1)
 
-# Training Model (Regresi)
-model = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=42)
+X = df.drop(columns=[target_col])
+y = df[target_col]
+
+# Split dataset jadi train dan test 
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+print(f"📊 Data train: {len(X_train)} | Data test: {len(X_test)}")
+
+input_example = X_train.iloc[0:5]
+
+# Training Model (Regresi) 
+model = RandomForestRegressor(
+    n_estimators=n_estimators, max_depth=max_depth, random_state=42
+)
 model.fit(X_train, y_train)
 predicted = model.predict(X_test)
 
-# --- (3) Log Parameter dan Metrik ---
+# Log Parameter dan Metrik ke MLflow
 mlflow.log_param("n_estimators", n_estimators)
 mlflow.log_param("max_depth", max_depth)
 
-# Metrik Regresi
 r2 = r2_score(y_test, predicted)
 mse = mean_squared_error(y_test, predicted)
+mae = np.mean(np.abs(y_test - predicted))
+rmse = np.sqrt(mse)
+
 mlflow.log_metric("r2_score", r2)
 mlflow.log_metric("mse", mse)
+mlflow.log_metric("mae", mae)
+mlflow.log_metric("rmse", rmse)
 
-print(f"Run complete. R2 Score: {r2:.4f}, MSE: {mse:.4f}")
+print(f"🏁 Run selesai. R2: {r2:.4f}, MAE: {mae:.4f}, RMSE: {rmse:.4f}")
 
-# --- (4) Log Model (Sangat Penting) ---
-# 'name' harus "model" agar build-docker bisa menemukannya
-print("Logging model...")
+# Log Model
+print("💾 Logging model ke MLflow...")
 mlflow.sklearn.log_model(
     sk_model=model,
-    # artifact_path="model", # <-- DIHAPUS, sesuai pesan error
-    name="model", # Ini akan otomatis membuat folder 'model' di artefak
+    name="model",
     input_example=input_example
 )
 
-# --- (5) PERBAIKAN: Simpan Artefak di Root (Bukan di sub-folder 'artifacts') ---
-# Hapus 'os.makedirs("artifacts", ...)'
-
-# Buat Plot Regresi (True vs Predicted)
-print("Creating regression plot...")
+# Buat Plot Hasil Regresi 
+print("📈 Membuat plot hasil prediksi...")
 plt.figure(figsize=(10, 6))
 plt.scatter(y_test, predicted, alpha=0.5)
-plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], '--k', lw=2)
+plt.plot(
+    [y_test.min(), y_test.max()],
+    [y_test.min(), y_test.max()],
+    '--k',
+    lw=2
+)
 plt.xlabel("True Values (Calories Burned)")
 plt.ylabel("Predicted Values (Calories Burned)")
 plt.title("True vs. Predicted Values")
-# Simpan plot di root
-plot_path = "regression_plot.png" 
+
+plot_path = "regression_plot.png"
 plt.savefig(plot_path)
 mlflow.log_artifact(plot_path)
 
-# Simpan Metrik ke JSON
-print("Saving metrics to JSON...")
+# Simpan metrik ke JSON 
+print("🧮 Menyimpan metrik ke JSON...")
 metrics = {
     "r2_score": r2,
-    "mse": mse
+    "mse": mse,
+    "mae": mae,
+    "rmse": rmse
 }
-# Simpan JSON di root
-json_path = "metrics.json" 
+json_path = "metrics.json"
 with open(json_path, "w") as f:
     json.dump(metrics, f)
 mlflow.log_artifact(json_path)
 
-print("Script finished successfully.")
+print("✅ Script selesai tanpa error.")
