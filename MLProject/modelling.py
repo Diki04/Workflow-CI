@@ -16,7 +16,7 @@ max_depth = int(sys.argv[2]) if len(sys.argv) > 2 else 10
 print(f"Training with n_estimators={n_estimators}, max_depth={max_depth}")
 
 # === Load dataset ===
-data_path = "../MLProject/gym_preprocessing/gym_tracking.csv"
+data_path = "../MLProject/gym_preprocessing/gym_cleaned.csv"
 try:
     print(f"📥 Memuat dataset tunggal dari: {data_path}")
     df = pd.read_csv(data_path)
