@@ -68,7 +68,7 @@ def main():
         
         
         # 4. Muat data mentah
-        df = load_data("../MLProject/gym_preprocessing/gym_tracking.csv") 
+        df = load_data("gym_preprocessing") 
         if df is None:
             raise Exception("Gagal memuat data mentah. Hentikan run.")
 
