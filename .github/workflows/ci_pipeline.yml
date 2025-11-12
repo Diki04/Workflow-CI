@@ -51,16 +51,6 @@ jobs:
         name: ml-model-artifacts
         path: MLProject/mlruns 
 
-    - name: Decode GDrive Credentials
-      run: echo "${{ secrets.GDRIVE_CREDENTIALS }}" | base64 --decode > gdrive-credentials.json
-
-    - name: Upload Artifacts to Google Drive (Jodebu)
-      uses: Jodebu/upload-to-drive@master
-      with:
-        target: MLProject/mlruns
-        credentials: gdrive-credentials.json
-        folder: ${{ secrets.GDRIVE_DESTINATION_FOLDER_ID }} 
-
     - name: 7. Login to Docker Hub
       uses: docker/login-action@v3
       with:
