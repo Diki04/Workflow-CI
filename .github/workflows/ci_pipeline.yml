@@ -52,7 +52,7 @@ jobs:
         path: MLProject/mlruns 
 
     - name: 6b. Upload Artifacts to Google Drive
-      uses: ludeeus/action-upload-google-drive@v2.0.0
+      uses: ludeeus/action-upload-google-drive@v3
       with:
         credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
         path: MLProject/mlruns/
