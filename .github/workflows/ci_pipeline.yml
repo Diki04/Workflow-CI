@@ -52,12 +52,11 @@ jobs:
         path: MLProject/mlruns 
 
     - name: 6b. Upload Artifacts to Google Drive
-      uses: anothrNick/drive-upload@v1.0.0
+      uses: ludeeus/action-upload-google-drive@v2.0.0
       with:
-        source: MLProject/mlruns
-        destination: ${{ secrets.GDRIVE_DESTINATION_FOLDER_ID }}
-      env: 
-        GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
+        credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
+        path: MLProject/mlruns/
+        folderId: ${{ secrets.GDRIVE_DESTINATION_FOLDER_ID }} 
 
     - name: 7. Login to Docker Hub
       uses: docker/login-action@v3
