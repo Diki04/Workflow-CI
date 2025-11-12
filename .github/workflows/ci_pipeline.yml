@@ -51,12 +51,12 @@ jobs:
         name: ml-model-artifacts
         path: MLProject/mlruns 
 
-    - name: 6b. Upload Artifacts to Google Drive
-      uses: ludeeus/action-upload-google-drive@v3
+    - name: Upload Artifacts to Google Drive (Jodebu)
+      uses: Jodebu/upload-to-drive@master
       with:
+        target: MLProject/mlruns
         credentials: ${{ secrets.GDRIVE_CREDENTIALS }}
-        path: MLProject/mlruns/
-        folderId: ${{ secrets.GDRIVE_DESTINATION_FOLDER_ID }} 
+        folder: ${{ secrets.GDRIVE_DESTINATION_FOLDER_ID }} 
 
     - name: 7. Login to Docker Hub
       uses: docker/login-action@v3
