@@ -16,7 +16,8 @@ from sklearn.metrics import (
     confusion_matrix
 )
 import seaborn as sns
-
+mlflow.set_tracking_uri("file:./mlruns")
+mlflow.set_registry_uri("file:./mlruns")
 os.environ.pop("MLFLOW_RUN_ID", None)
 os.environ.pop("MLFLOW_ACTIVE_RUN_ID", None)
 
