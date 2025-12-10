@@ -62,6 +62,7 @@ with mlflow.start_run():
     predicted = model.predict(X_test)
 
     mlflow.log_param("n_estimators", n_estimators)
+    
     mlflow.log_param("max_depth", max_depth)
 
     acc = accuracy_score(y_test, predicted)
