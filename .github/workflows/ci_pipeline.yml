@@ -33,8 +33,7 @@ jobs:
     - name: 4. Run MLflow Project (Training)
       run: |
         # Jalankan 'main' entry point dari file MLProject
-        mlflow run . --env-manager=local
-        
+        mlflow run MLProject --env-manager=local
 
     #  4. Menyimpan Artefak
     - name: 5. Get latest MLflow run_id
