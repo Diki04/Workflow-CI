@@ -20,13 +20,11 @@ import seaborn as sns
 os.environ.pop("MLFLOW_RUN_ID", None)
 os.environ.pop("MLFLOW_ACTIVE_RUN_ID", None)
 
-# === Parameter dari CLI (default bila tidak ada input) ===
 n_estimators = int(sys.argv[1]) if len(sys.argv) > 1 else 100
 max_depth = int(sys.argv[2]) if len(sys.argv) > 2 else 10
 print(f"Training with n_estimators={n_estimators}, max_depth={max_depth}")
 
-# === Load dataset ===
-data_path = "../MLProject/gym_preprocessing/gym_cleaned.csv"
+data_path = "../MLProject/gym_preprocessing/gym_preprocessed.csv"
 try:
     print(f"📥 Memuat dataset tunggal dari: {data_path}")
     df = pd.read_csv(data_path)
@@ -35,40 +33,14 @@ except FileNotFoundError:
     print(f"❌ Error: File {data_path} tidak ditemukan.")
     sys.exit(1)
 
-# === Preprocessing Data ===
-print("🧹 Melakukan preprocessing data...")
-
-before = len(df)
-df = df.drop_duplicates()
-print(f"   🔁 Hapus duplikasi: {before - len(df)} baris dihapus")
-
-missing = df.isnull().sum().sum()
-if missing > 0:
-    print(f"   ⚠️ Menemukan {missing} nilai kosong — mengganti dengan median/nilai modus")
-    for col in df.columns:
-        if df[col].dtype == 'object':
-            df[col].fillna(df[col].mode()[0], inplace=True)
-        else:
-            df[col].fillna(df[col].median(), inplace=True)
-else:
-    print("   ✅ Tidak ada nilai kosong")
-
-categorical_cols = df.select_dtypes(include=['object']).columns
-if len(categorical_cols) > 0:
-    print(f"   🔡 Encoding kolom kategorikal: {list(categorical_cols)}")
-    df = pd.get_dummies(df, columns=categorical_cols, drop_first=True)
-else:
-    print("   ✅ Tidak ada kolom kategorikal")
-
-print(f"✅ Preprocessing selesai. Bentuk data: {df.shape}")
-
 # === Pisahkan fitur dan target ===
-target_col = "Calories_Level"
+target_col = "Calories_Burned"
 if target_col not in df.columns:
     print(f"❌ Kolom target '{target_col}' tidak ditemukan di dataset.")
     sys.exit(1)
 
 X = df.drop(columns=[target_col])
+print(X)
 y = df[target_col]
 
 # === Split train dan test ===
@@ -79,11 +51,12 @@ print(f"📊 Data train: {len(X_train)} | Data test: {len(X_test)}")
 
 input_example = X_train.iloc[0:5]
 
-# ==========================================
-#            MLflow Start Run
-# ==========================================
+mlflow.end_run()
+mlflow.set_tracking_uri("file:./mlruns")
+
+
+# MLflow Start Run
 with mlflow.start_run():
-    # === Training Model ===
     model = RandomForestClassifier(
         n_estimators=n_estimators,
         max_depth=max_depth,
@@ -92,11 +65,9 @@ with mlflow.start_run():
     model.fit(X_train, y_train)
     predicted = model.predict(X_test)
 
-    # === Logging Parameter ===
     mlflow.log_param("n_estimators", n_estimators)
     mlflow.log_param("max_depth", max_depth)
 
-    # === METRIC KLASIFIKASI ===
     acc = accuracy_score(y_test, predicted)
     precision = precision_score(y_test, predicted, average="macro", zero_division=0)
     recall = recall_score(y_test, predicted, average="macro", zero_division=0)
@@ -107,18 +78,16 @@ with mlflow.start_run():
     mlflow.log_metric("recall", recall)
     mlflow.log_metric("f1_score", f1)
 
-    print(f"🏁 Run selesai. Accuracy: {acc:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, F1: {f1:.4f}")
+    print(f"Run selesai. Accuracy: {acc:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, F1: {f1:.4f}")
 
-    # === Logging Model ===
-    print("💾 Logging model ke MLflow...")
+    print("Logging model ke MLflow...")
     mlflow.sklearn.log_model(
         sk_model=model,
         name="model",
         input_example=input_example
     )
 
-    # === Plot Confusion Matrix ===
-    print("📈 Membuat confusion matrix plot...")
+    print("Membuat confusion matrix plot...")
     cm = confusion_matrix(y_test, predicted)
 
     plt.figure(figsize=(8, 6))
@@ -130,8 +99,7 @@ with mlflow.start_run():
     plt.savefig(plot_path)
     mlflow.log_artifact(plot_path)
 
-    # === Simpan metrik ke JSON ===
-    print("🧮 Menyimpan metrik ke JSON...")
+    print("Menyimpan metrik ke JSON...")
     metrics = {
         "accuracy": acc,
         "precision": precision,
@@ -143,4 +111,4 @@ with mlflow.start_run():
         json.dump(metrics, f)
     mlflow.log_artifact(json_path)
 
-print("✅ Script selesai tanpa error.")
+print("Script selesai tanpa error.")
