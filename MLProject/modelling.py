@@ -1,6 +1,6 @@
 import mlflow
 import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 import os
 import numpy as np
@@ -8,7 +8,14 @@ import warnings
 import sys
 import json
 import matplotlib.pyplot as plt
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix
+)
+import seaborn as sns
 
 # === Parameter dari CLI (default bila tidak ada input) ===
 n_estimators = int(sys.argv[1]) if len(sys.argv) > 1 else 100
@@ -56,7 +63,7 @@ else:
 print(f"✅ Preprocessing selesai. Bentuk data: {df.shape}")
 
 # === Pisahkan fitur dan target ===
-target_col = "Calories_Burned"
+target_col = "Calories_Level"  # *** TARGET KLASIFIKASI ***
 if target_col not in df.columns:
     print(f"❌ Kolom target '{target_col}' tidak ditemukan di dataset.")
     sys.exit(1)
@@ -73,8 +80,10 @@ print(f"📊 Data train: {len(X_train)} | Data test: {len(X_test)}")
 input_example = X_train.iloc[0:5]
 
 # === Training Model ===
-model = RandomForestRegressor(
-    n_estimators=n_estimators, max_depth=max_depth, random_state=42
+model = RandomForestClassifier(
+    n_estimators=n_estimators,
+    max_depth=max_depth,
+    random_state=42
 )
 model.fit(X_train, y_train)
 predicted = model.predict(X_test)
@@ -83,17 +92,18 @@ predicted = model.predict(X_test)
 mlflow.log_param("n_estimators", n_estimators)
 mlflow.log_param("max_depth", max_depth)
 
-r2 = r2_score(y_test, predicted)
-mse = mean_squared_error(y_test, predicted)
-mae = np.mean(np.abs(y_test - predicted))
-rmse = np.sqrt(mse)
+# === METRIC KLASIFIKASI ===
+acc = accuracy_score(y_test, predicted)
+precision = precision_score(y_test, predicted, average="macro", zero_division=0)
+recall = recall_score(y_test, predicted, average="macro", zero_division=0)
+f1 = f1_score(y_test, predicted, average="macro", zero_division=0)
 
-mlflow.log_metric("r2_score", r2)
-mlflow.log_metric("mse", mse)
-mlflow.log_metric("mae", mae)
-mlflow.log_metric("rmse", rmse)
+mlflow.log_metric("accuracy", acc)
+mlflow.log_metric("precision", precision)
+mlflow.log_metric("recall", recall)
+mlflow.log_metric("f1_score", f1)
 
-print(f"🏁 Run selesai. R2: {r2:.4f}, MAE: {mae:.4f}, RMSE: {rmse:.4f}")
+print(f"🏁 Run selesai. Accuracy: {acc:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, F1: {f1:.4f}")
 
 # === Logging Model ===
 print("💾 Logging model ke MLflow...")
@@ -103,26 +113,26 @@ mlflow.sklearn.log_model(
     input_example=input_example
 )
 
-# === Plot hasil regresi ===
-print("📈 Membuat plot hasil prediksi...")
-plt.figure(figsize=(10, 6))
-plt.scatter(y_test, predicted, alpha=0.5)
-plt.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], '--k', lw=2)
-plt.xlabel("True Values (Calories Burned)")
-plt.ylabel("Predicted Values (Calories Burned)")
-plt.title("True vs. Predicted Values")
+# === Plot Confusion Matrix ===
+print("📈 Membuat confusion matrix plot...")
+cm = confusion_matrix(y_test, predicted)
 
-plot_path = "regression_plot.png"
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
+plt.xlabel("Predicted")
+plt.ylabel("True")
+plt.title("Confusion Matrix")
+plot_path = "confusion_matrix.png"
 plt.savefig(plot_path)
 mlflow.log_artifact(plot_path)
 
 # === Simpan metrik ke JSON ===
 print("🧮 Menyimpan metrik ke JSON...")
 metrics = {
-    "r2_score": r2,
-    "mse": mse,
-    "mae": mae,
-    "rmse": rmse
+    "accuracy": acc,
+    "precision": precision,
+    "recall": recall,
+    "f1_score": f1
 }
 json_path = "metrics.json"
 with open(json_path, "w") as f:

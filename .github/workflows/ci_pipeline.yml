@@ -1,4 +1,4 @@
-name: MLflow CI-CD Kriteria 3 (Gym Regression)
+name: MLflow CI-CD Kriteria 3 (Gym Classification)
 
 on:
   push:
