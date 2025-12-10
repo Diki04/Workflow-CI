@@ -35,12 +35,10 @@ except FileNotFoundError:
 # === Preprocessing Data ===
 print("🧹 Melakukan preprocessing data...")
 
-# Hapus duplikasi
 before = len(df)
 df = df.drop_duplicates()
 print(f"   🔁 Hapus duplikasi: {before - len(df)} baris dihapus")
 
-# Tangani nilai kosong
 missing = df.isnull().sum().sum()
 if missing > 0:
     print(f"   ⚠️ Menemukan {missing} nilai kosong — mengganti dengan median/nilai modus")
@@ -52,7 +50,6 @@ if missing > 0:
 else:
     print("   ✅ Tidak ada nilai kosong")
 
-# Encoding untuk kolom kategorikal (object)
 categorical_cols = df.select_dtypes(include=['object']).columns
 if len(categorical_cols) > 0:
     print(f"   🔡 Encoding kolom kategorikal: {list(categorical_cols)}")
@@ -63,7 +60,7 @@ else:
 print(f"✅ Preprocessing selesai. Bentuk data: {df.shape}")
 
 # === Pisahkan fitur dan target ===
-target_col = "Calories_Level"  # *** TARGET KLASIFIKASI ***
+target_col = "Calories_Level"
 if target_col not in df.columns:
     print(f"❌ Kolom target '{target_col}' tidak ditemukan di dataset.")
     sys.exit(1)
@@ -79,64 +76,68 @@ print(f"📊 Data train: {len(X_train)} | Data test: {len(X_test)}")
 
 input_example = X_train.iloc[0:5]
 
-# === Training Model ===
-model = RandomForestClassifier(
-    n_estimators=n_estimators,
-    max_depth=max_depth,
-    random_state=42
-)
-model.fit(X_train, y_train)
-predicted = model.predict(X_test)
+# ==========================================
+#            MLflow Start Run
+# ==========================================
+with mlflow.start_run():
+    # === Training Model ===
+    model = RandomForestClassifier(
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        random_state=42
+    )
+    model.fit(X_train, y_train)
+    predicted = model.predict(X_test)
 
-# === Logging Parameter & Metrik ===
-mlflow.log_param("n_estimators", n_estimators)
-mlflow.log_param("max_depth", max_depth)
+    # === Logging Parameter ===
+    mlflow.log_param("n_estimators", n_estimators)
+    mlflow.log_param("max_depth", max_depth)
 
-# === METRIC KLASIFIKASI ===
-acc = accuracy_score(y_test, predicted)
-precision = precision_score(y_test, predicted, average="macro", zero_division=0)
-recall = recall_score(y_test, predicted, average="macro", zero_division=0)
-f1 = f1_score(y_test, predicted, average="macro", zero_division=0)
+    # === METRIC KLASIFIKASI ===
+    acc = accuracy_score(y_test, predicted)
+    precision = precision_score(y_test, predicted, average="macro", zero_division=0)
+    recall = recall_score(y_test, predicted, average="macro", zero_division=0)
+    f1 = f1_score(y_test, predicted, average="macro", zero_division=0)
 
-mlflow.log_metric("accuracy", acc)
-mlflow.log_metric("precision", precision)
-mlflow.log_metric("recall", recall)
-mlflow.log_metric("f1_score", f1)
+    mlflow.log_metric("accuracy", acc)
+    mlflow.log_metric("precision", precision)
+    mlflow.log_metric("recall", recall)
+    mlflow.log_metric("f1_score", f1)
 
-print(f"🏁 Run selesai. Accuracy: {acc:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, F1: {f1:.4f}")
+    print(f"🏁 Run selesai. Accuracy: {acc:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, F1: {f1:.4f}")
 
-# === Logging Model ===
-print("💾 Logging model ke MLflow...")
-mlflow.sklearn.log_model(
-    sk_model=model,
-    name="model",
-    input_example=input_example
-)
+    # === Logging Model ===
+    print("💾 Logging model ke MLflow...")
+    mlflow.sklearn.log_model(
+        sk_model=model,
+        name="model",
+        input_example=input_example
+    )
 
-# === Plot Confusion Matrix ===
-print("📈 Membuat confusion matrix plot...")
-cm = confusion_matrix(y_test, predicted)
+    # === Plot Confusion Matrix ===
+    print("📈 Membuat confusion matrix plot...")
+    cm = confusion_matrix(y_test, predicted)
 
-plt.figure(figsize=(8, 6))
-sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
-plt.xlabel("Predicted")
-plt.ylabel("True")
-plt.title("Confusion Matrix")
-plot_path = "confusion_matrix.png"
-plt.savefig(plot_path)
-mlflow.log_artifact(plot_path)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.title("Confusion Matrix")
+    plot_path = "confusion_matrix.png"
+    plt.savefig(plot_path)
+    mlflow.log_artifact(plot_path)
 
-# === Simpan metrik ke JSON ===
-print("🧮 Menyimpan metrik ke JSON...")
-metrics = {
-    "accuracy": acc,
-    "precision": precision,
-    "recall": recall,
-    "f1_score": f1
-}
-json_path = "metrics.json"
-with open(json_path, "w") as f:
-    json.dump(metrics, f)
-mlflow.log_artifact(json_path)
+    # === Simpan metrik ke JSON ===
+    print("🧮 Menyimpan metrik ke JSON...")
+    metrics = {
+        "accuracy": acc,
+        "precision": precision,
+        "recall": recall,
+        "f1_score": f1
+    }
+    json_path = "metrics.json"
+    with open(json_path, "w") as f:
+        json.dump(metrics, f)
+    mlflow.log_artifact(json_path)
 
 print("✅ Script selesai tanpa error.")
