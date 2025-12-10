@@ -36,28 +36,13 @@ jobs:
         mlflow run MLProject --env-manager=local
 
     #  4. Menyimpan Artefak
-    # 4. Menyimpan Artefak & Mengambil ID (DIPERBAIKI)
     - name: 5. Get latest MLflow run_id
-      id: get_run_id 
+      id: get_run_id
       run: |
-        # Gunakan Absolute Path agar perintah ls tidak bingung
-        SEARCH_DIR="${{ github.workspace }}/MLProject/mlruns/0"
-        
-        # Ambil folder terakhir yang dimodifikasi, lalu ambil nama basenya saja (bersih dari slash)
-        # 'basename' jauh lebih aman daripada 'cut' untuk mengambil nama folder
-        LATEST_PATH=$(ls -td "$SEARCH_DIR"/*/ | head -n 1)
-        RUN_ID=$(basename "$LATEST_PATH")
-        
-        # Validasi: Pastikan RUN_ID tidak kosong
-        if [ -z "$RUN_ID" ]; then
-          echo "❌ Error: Tidak dapat menemukan RUN_ID di $SEARCH_DIR"
-          exit 1
-        fi
-        
-        echo "✅ Ditemukan RUN_ID: $RUN_ID"
-        
-        # Simpan ke output
+        RUN_ID=$(ls -1t MLProject/mlruns/0 | head -n 1)
+        echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
         echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+        echo "Latest run_id: $RUN_ID"
 
     - name: 6. Upload Artifacts (Model)
       uses: actions/upload-artifact@v4
@@ -71,24 +56,20 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    # 5. Build & Push Docker (DIPERBAIKI)
+    #  5. Build & Push Docker
     - name: 8. Build Docker Image with MLflow
       run: |
-        # Ambil RUN_ID yang sudah dibersihkan dari langkah 5
-        RUN_ID="${{ steps.get_run_id.outputs.run_id }}"
+        # Ambil RUN_ID dari langkah 5
+        RUN_ID=${{ steps.get_run_id.outputs.run_id }}
         
-        # KUNCI KEBERHASILAN: Gunakan 'file://' + Absolute Path
-        # Ini memaksa MLflow membaca database di lokasi yang TEPAT
-        export MLFLOW_TRACKING_URI="file://${{ github.workspace }}/MLProject/mlruns"
+        # Beritahu MLflow di mana harus mencari 'mlruns'
+        export MLFLOW_TRACKING_URI=MLProject/mlruns
         
-        echo "🔍 Debug Info:"
-        echo "   RUN_ID: $RUN_ID"
-        echo "   URI   : $MLFLOW_TRACKING_URI"
+        echo "Membangun Docker image untuk RUN_ID: $RUN_ID dari $MLFLOW_TRACKING_URI"
         
-        # Gunakan sintaks standar 'runs:/' 
-        # MLflow akan otomatis mencari folder artifact berdasarkan ID dan URI di atas
+        # Sekarang sintaks 'runs:/' akan berfungsi
         mlflow models build-docker \
-          --model-uri "runs:/$RUN_ID/model" \
+          --model-uri "MLProject/mlruns/0/$RUN_ID/artifacts/model" \
           --name "firecrown/model-gym-ci" \
           --env-manager=local
 
