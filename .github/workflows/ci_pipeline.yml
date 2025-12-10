@@ -31,16 +31,18 @@ jobs:
     
     # 3. Menjalankan Training
     - name: 4. Run MLflow Project (Training)
+      working-directory: MLProject
       run: |
-        # Jalankan 'main' entry point dari file MLProject
-        mlflow run MLProject --env-manager=local
+        mlflow run . --env-manager=local
+
 
     #  4. Menyimpan Artefak
     - name: 5. Get latest MLflow run_id
       id: get_run_id
       run: |
-        RUN_ID=$(ls -td mlruns/*/* | head -1 | sed 's#.*/##')
-        echo "MLFLOW_RUN_ID=$RUN_ID" >> $GITHUB_ENV
+        MODEL_ID=$(ls MLProject/mlruns/0/models | head -1)
+        echo "model_id=$MODEL_ID" >> $GITHUB_ENV
+        echo "Model ID: $MODEL_ID"
 
 
     - name: 6. Upload Artifacts (Model)
