@@ -23,32 +23,47 @@ jobs:
       with:
         python-version: "3.12.7"
 
-    # 2. Instalasi (Pip-based, lebih cepat)
+    # 2. Instalasi
     - name: 3. Install Dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r MLProject/requirements.txt
     
-    # 3. Menjalankan Training
+    # 3. Menjalankan Training (FIXED)
     - name: 4. Run MLflow Project (Training)
       run: |
-        # Jalankan 'main' entry point dari file MLProject
+        # Definisi Absolute Path untuk Tracking URI
+        # Ini memaksa MLflow menulis di lokasi yang pasti, bukan relatif
+        export MLFLOW_TRACKING_URI="file://${{ github.workspace }}/MLProject/mlruns"
+        
+        echo "Tracking URI set to: $MLFLOW_TRACKING_URI"
+        
+        # Jalankan MLflow Project
         mlflow run MLProject --env-manager=local
 
-    #  4. Menyimpan Artefak
+    # 4. Menyimpan Artefak (FIXED)
     - name: 5. Get latest MLflow run_id
       id: get_run_id 
       run: |
-        # Cari RUN_ID terakhir di dalam folder mlruns
+        # Pastikan path pencarian sesuai dengan struktur folder
+        # Kita mencari folder yang baru saja dimodifikasi (-t)
         RUN_ID=$(ls -td MLProject/mlruns/0/*/ | head -n 1 | cut -d'/' -f4)
+        
+        if [ -z "$RUN_ID" ]; then
+          echo "Error: RUN_ID not found!"
+          exit 1
+        fi
+        
+        echo "Found RUN_ID: $RUN_ID"
+        
         echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
         echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
-        echo "Latest run_id: $RUN_ID"
 
     - name: 6. Upload Artifacts (Model)
       uses: actions/upload-artifact@v4
       with:
         name: ml-model-artifacts
+        # Upload seluruh folder mlruns untuk keperluan debugging/history
         path: MLProject/mlruns 
 
     - name: 7. Login to Docker Hub
@@ -57,43 +72,42 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    #  5. Build & Push Docker
+    # 5. Build & Push Docker (FIXED)
     - name: 8. Build Docker Image with MLflow
       run: |
-        # Ambil RUN_ID dari langkah 5
         RUN_ID=${{ steps.get_run_id.outputs.run_id }}
         
-        # Beritahu MLflow di mana harus mencari 'mlruns'
-        export MLFLOW_TRACKING_URI=MLProject/mlruns
+        # SANGAT PENTING: Gunakan Tracking URI yang sama persis (Absolute Path)
+        export MLFLOW_TRACKING_URI="file://${{ github.workspace }}/MLProject/mlruns"
         
-        echo "Membangun Docker image untuk RUN_ID: $RUN_ID dari $MLFLOW_TRACKING_URI"
+        echo "Building Docker for RUN_ID: $RUN_ID using URI: $MLFLOW_TRACKING_URI"
         
-        # Sekarang sintaks 'runs:/' akan berfungsi
+        # Gunakan sintaks 'runs:/' yang standar
         mlflow models build-docker \
-          --model-uri "MLProject/mlruns/0/$RUN_ID/artifacts/" \
+          --model-uri "runs:/$RUN_ID/model" \
           --name "firecrown/model-gym-ci" \
           --env-manager=local
 
     - name: 9. Tag and Push Docker Image
       run: |
-        # Tag image yang di-build di Langkah 8
         docker tag "firecrown/model-gym-ci" "${{ secrets.DOCKERHUB_USERNAME }}/model-gym-ci:latest"
-        
-        # Push image ke Docker Hub
         docker push "${{ secrets.DOCKERHUB_USERNAME }}/model-gym-ci:latest"
 
     # 6. Push Artefak kembali ke Repo 
     - name: 10. Commit and push ML artifacts
+      # Tambahkan 'continue-on-error' agar jika tidak ada perubahan, job tetap hijau
+      continue-on-error: true
       run: |
         git config --global user.name 'github-actions[bot]'
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
         
-        # Cari file artefak di 'MLProject/'
+        # Pastikan kita menarik perubahan terbaru dulu untuk menghindari konflik
+        git pull origin main --rebase
+        
         git add MLProject/*.png MLProject/*.json
         
-        # Cek jika ada perubahan untuk di-commit
         if [ -n "$(git status --porcelain)" ]; then
-          git commit -m " [CI] Add regression plot and metrics"
+          git commit -m "[CI] Add classification plot and metrics for Run $RUN_ID"
           git push
         else
           echo "Tidak ada artefak baru untuk di-commit."
