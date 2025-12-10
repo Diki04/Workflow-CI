@@ -17,7 +17,8 @@ from sklearn.metrics import (
 )
 import seaborn as sns
 
-
+# Bersihkan environment tracking ID yang mengganggu
+os.environ.pop("MLFLOW_ACTIVE_RUN_ID", None)
 
 n_estimators = int(sys.argv[1]) if len(sys.argv) > 1 else 100
 max_depth = int(sys.argv[2]) if len(sys.argv) > 2 else 10
@@ -39,7 +40,6 @@ if target_col not in df.columns:
     sys.exit(1)
 
 X = df.drop(columns=[target_col])
-print(X)
 y = df[target_col]
 
 # === Split train dan test ===
@@ -50,61 +50,74 @@ print(f"📊 Data train: {len(X_train)} | Data test: {len(X_test)}")
 
 input_example = X_train.iloc[0:5]
 
-# MLflow Start Run
-with mlflow.start_run():
-    model = RandomForestClassifier(
-        n_estimators=n_estimators,
-        max_depth=max_depth,
-        random_state=42
-    )
-    model.fit(X_train, y_train)
-    predicted = model.predict(X_test)
+# ============================================
+# CEK RUN EXISTING (Jangan buat run baru lagi)
+# ============================================
+existing_run_id = os.environ.get("MLFLOW_RUN_ID")
 
-    mlflow.log_param("n_estimators", n_estimators)
-    
-    mlflow.log_param("max_depth", max_depth)
+if existing_run_id:
+    print(f"🔄 Melanjutkan MLflow run yang sudah ada: {existing_run_id}")
+    mlflow.start_run(run_id=existing_run_id)
+else:
+    print("🆕 Tidak ada run aktif — membuat run baru.")
+    mlflow.start_run()
 
-    acc = accuracy_score(y_test, predicted)
-    precision = precision_score(y_test, predicted, average="macro", zero_division=0)
-    recall = recall_score(y_test, predicted, average="macro", zero_division=0)
-    f1 = f1_score(y_test, predicted, average="macro", zero_division=0)
+# ===================
+# Mulai training model
+# ===================
 
-    mlflow.log_metric("accuracy", acc)
-    mlflow.log_metric("precision", precision)
-    mlflow.log_metric("recall", recall)
-    mlflow.log_metric("f1_score", f1)
+model = RandomForestClassifier(
+    n_estimators=n_estimators,
+    max_depth=max_depth,
+    random_state=42
+)
+model.fit(X_train, y_train)
+predicted = model.predict(X_test)
 
-    print(f"Run selesai. Accuracy: {acc:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, F1: {f1:.4f}")
+mlflow.log_param("n_estimators", n_estimators)
+mlflow.log_param("max_depth", max_depth)
 
-    print("Logging model ke MLflow...")
-    mlflow.sklearn.log_model(
-        sk_model=model,
-        artifact_path="model",
-        input_example=input_example
-    )
+acc = accuracy_score(y_test, predicted)
+precision = precision_score(y_test, predicted, average="macro", zero_division=0)
+recall = recall_score(y_test, predicted, average="macro", zero_division=0)
+f1 = f1_score(y_test, predicted, average="macro", zero_division=0)
 
-    print("Membuat confusion matrix plot...")
-    cm = confusion_matrix(y_test, predicted)
+mlflow.log_metric("accuracy", acc)
+mlflow.log_metric("precision", precision)
+mlflow.log_metric("recall", recall)
+mlflow.log_metric("f1_score", f1)
 
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
-    plt.xlabel("Predicted")
-    plt.ylabel("True")
-    plt.title("Confusion Matrix")
-    plot_path = "confusion_matrix.png"
-    plt.savefig(plot_path)
-    mlflow.log_artifact(plot_path)
+print(f"Run selesai. Accuracy: {acc:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, F1: {f1:.4f}")
 
-    print("Menyimpan metrik ke JSON...")
-    metrics = {
-        "accuracy": acc,
-        "precision": precision,
-        "recall": recall,
-        "f1_score": f1
-    }
-    json_path = "metrics.json"
-    with open(json_path, "w") as f:
-        json.dump(metrics, f)
-    mlflow.log_artifact(json_path)
+print("Logging model ke MLflow...")
+mlflow.sklearn.log_model(
+    sk_model=model,
+    artifact_path="model",
+    input_example=input_example
+)
+
+print("Membuat confusion matrix plot...")
+cm = confusion_matrix(y_test, predicted)
+
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
+plt.xlabel("Predicted")
+plt.ylabel("True")
+plt.title("Confusion Matrix")
+plot_path = "confusion_matrix.png"
+plt.savefig(plot_path)
+mlflow.log_artifact(plot_path)
+
+print("Menyimpan metrik ke JSON...")
+metrics = {
+    "accuracy": acc,
+    "precision": precision,
+    "recall": recall,
+    "f1_score": f1
+}
+json_path = "metrics.json"
+with open(json_path, "w") as f:
+    json.dump(metrics, f)
+mlflow.log_artifact(json_path)
 
 print("Script selesai tanpa error.")
