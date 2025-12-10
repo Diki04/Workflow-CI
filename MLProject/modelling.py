@@ -79,7 +79,7 @@ with mlflow.start_run():
     print("Logging model ke MLflow...")
     mlflow.sklearn.log_model(
         sk_model=model,
-        name="model",
+        artifact_path="model",
         input_example=input_example
     )
 
