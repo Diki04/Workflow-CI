@@ -1,14 +1,5 @@
 name: Gym_Regression_CI
 
-environment:
-  image: python:3.12.7
-  pip_requirements: requirements.txt
-
-# Definisi entry point
 entry_points:
   main:
-    parameters:
-      n_estimators: {type: int, default: 100}
-      max_depth: {type: int, default: 10}
-
-    command: "python modelling.py {n_estimators} {max_depth}"
+    command: "python modelling.py"
